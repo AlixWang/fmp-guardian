@@ -1,0 +1,18 @@
+{
+  "name": "fmp-guardian-skill",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Generic Fractal Mirror Protocol Skill for agent-native codebases.",
+  "scripts": {
+    "fmp:init": "node scripts/fmp-init.mjs",
+    "fmp:check": "node scripts/fmp-check.mjs",
+    "fmp:doctor": "node scripts/fmp-doctor.mjs",
+    "fmp:seed-l3": "node scripts/fmp-seed-l3.mjs --write",
+    "fmp:sync-plan": "node scripts/fmp-sync-plan.mjs",
+    "fmp:eval": "node scripts/fmp-eval.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

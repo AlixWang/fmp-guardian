@@ -1,0 +1,191 @@
+---
+name: fmp-guardian
+description: Generic Fractal Mirror Protocol bootstrap and maintenance skill. Use in any repository to initialize project-local AGENTS.md, .fmp config, mirror matrix, L3-Lite anchors, sync plans, and drift/eval checks without hardcoding project-specific paths.
+user-invokable: true
+---
+
+# FMP Guardian
+
+You are a generic Fractal Mirror Protocol guardian.
+
+Your job is not to apply a fixed project convention.  
+Your job is to discover the current repository, infer its architecture boundaries, and generate project-local FMP rules.
+
+## Core Principle
+
+The skill is universal.  
+The project rules are local.
+
+Never hardcode paths from another project.
+Never assume `src/server`, `apps/web`, `spec`, or `evals` exist.
+Always discover first.
+
+## What FMP Means
+
+FMP = Fractal Mirror Protocol.
+
+It keeps code facts and semantic mirrors aligned through:
+
+- sparse `AGENTS.md`
+- project-local `.fmp/config.json`
+- project-local `.fmp/mirror-matrix.yaml`
+- short L3-Lite file anchors for selected P0 files
+- drift checks
+- tests/evals/check gates
+
+FMP is not "write more docs".  
+FMP is "give code agents a low-noise semantic map".
+
+## Modes
+
+### Mode: init
+
+Use when the user asks to initialize FMP in a project.
+
+Steps:
+
+1. Discover project shape:
+   - language markers
+   - package manager
+   - workspace layout
+   - application/package/service boundaries
+   - existing docs
+   - existing tests/evals/checks
+   - existing agent instruction files
+
+2. Classify paths:
+   - P0: high-risk semantic drift paths
+   - P1: ordinary business paths
+   - P2: exempt/generated/trivial paths
+
+3. Generate project-local artifacts:
+   - `AGENTS.md`
+   - `.fmp/config.json`
+   - `.fmp/mirror-matrix.yaml`
+   - `.fmp/status.md`
+   - optional `CLAUDE.md` compatibility shim
+
+4. Seed sparse module docs only for real boundaries:
+   - monorepo package
+   - backend service
+   - frontend app
+   - core domain
+   - agent/workflow/retrieval/persistence subsystem
+
+5. Add L3-Lite only to selected P0 files, or produce a candidate list if confidence is low.
+
+6. Report:
+   - detected project type
+   - generated files
+   - P0/P1/P2 classification
+   - mirror matrix summary
+   - remaining FMP debt
+
+### Mode: sync-plan
+
+Use when the user proposes or performs design/architecture changes.
+
+Steps:
+
+1. Summarize the design decision.
+2. Map affected code areas using `.fmp/mirror-matrix.yaml`.
+3. Identify semantic mirrors that need updates.
+4. Identify checks/evals likely required.
+5. Produce a sync plan before editing broad areas.
+6. Apply updates only to relevant local project files.
+
+### Mode: check
+
+Use before finishing a code change.
+
+Steps:
+
+1. Read `.fmp/config.json`.
+2. Read `.fmp/mirror-matrix.yaml`.
+3. Check changed P0 files.
+4. Verify L3-Lite anchors.
+5. Verify mirror docs were checked or updated.
+6. Verify tests/evals/checks were run or explain why not.
+7. Return PASS / WARN / FAIL.
+
+### Mode: doctor
+
+Use to assess FMP health.
+
+Steps:
+
+1. Measure root `AGENTS.md` health.
+2. Measure nested `AGENTS.md` count and relevance.
+3. Measure P0 L3-Lite coverage.
+4. Detect stale mirror links.
+5. Detect missing docs for high-risk modules.
+6. Recommend minimal repairs.
+
+## P0 Heuristics
+
+Classify a path as P0 if it contains or controls:
+
+- public API
+- exported contracts
+- domain model
+- state machine
+- workflow/orchestrator
+- persistence/schema/migration
+- auth/security/permission
+- payment/billing
+- message/event protocol
+- agent/prompt/tool/RAG/memory
+- eval/benchmark/golden tests
+- deployment/runtime config
+
+## Exempt Heuristics
+
+Do not add L3-Lite to:
+
+- generated files
+- lock files
+- snapshots
+- build outputs
+- vendored dependencies
+- static assets
+- simple style files
+- trivial configs
+
+## L3-Lite
+
+Use this format only:
+
+```text
+[FMP]: short file role
+[MIRROR]: semantic mirror path or mirror id
+[EXPORT]: main exports
+[CHECK]: what changes require sync
+```
+
+Keep it short.  
+Do not duplicate imports.  
+Do not explain implementation.  
+Do not create long file headers.
+
+## Preferred Commands
+
+When available in the project:
+
+```bash
+node .agents/skills/fmp-guardian/scripts/fmp-init.mjs
+node .agents/skills/fmp-guardian/scripts/fmp-doctor.mjs
+node .agents/skills/fmp-guardian/scripts/fmp-check.mjs
+node .agents/skills/fmp-guardian/scripts/fmp-sync-plan.mjs "design decision"
+node .agents/skills/fmp-guardian/scripts/fmp-seed-l3.mjs --write
+node .agents/skills/fmp-guardian/scripts/fmp-eval.mjs
+```
+
+## Final Response
+
+Always report:
+
+- project-local FMP files touched
+- code files touched
+- semantic mirrors touched
+- checks/evals run
+- FMP debt remaining
