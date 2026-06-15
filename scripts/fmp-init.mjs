@@ -12,6 +12,7 @@ import {
   parseArgs,
   readText,
   rootFromArgs,
+  selectP0Files,
   unique,
   walk,
   writeJson,
@@ -79,7 +80,9 @@ const config = {
   },
   l3Lite: {
     enabled: true,
-    requiredFor: ['p0'],
+    requiredFor: ['selected-p0'],
+    selectedFiles: [],
+    candidateLimit: 30,
     maxLines: 6,
     requiredTags: ['FMP', 'MIRROR', 'EXPORT', 'CHECK'],
     failOnMissing: false,
@@ -95,6 +98,7 @@ const config = {
     commands,
   },
 }
+config.l3Lite.selectedFiles = selectP0Files(root, config)
 
 const matrixYaml = `version: 0.1
 
@@ -135,7 +139,7 @@ ${commandsBlock}
 
 - Root \`AGENTS.md\` is the primary agent instruction file.
 - \`CLAUDE.md\`, if present, should import or point to \`AGENTS.md\`.
-- P0 files may use L3-Lite anchors.
+- Only selected P0 files in \`l3Lite.selectedFiles\` should receive L3-Lite anchors by default.
 - Generated files and trivial files should not receive L3-Lite.
 - \`.fmp/mirror-matrix.yaml\` is the source of truth for code/document/eval synchronization.
 
@@ -180,10 +184,16 @@ Generated: ${new Date().toISOString()}
 - Mirror matrix: generated
 - P0 pattern candidates: ${classification.p0.length}
 - P1 pattern candidates: ${classification.p1.length}
+- Selected P0 files: ${config.l3Lite.selectedFiles.length}
+
+## Selected P0
+
+${config.l3Lite.selectedFiles.length ? config.l3Lite.selectedFiles.slice(0, 30).map(f => `- \`${f}\``).join('\n') : '- No selected P0 files were inferred. Review `.fmp/config.json` and add `l3Lite.selectedFiles` manually.'}
 
 ## FMP Debt
 
 ${mirrors.filter(m => !m.docs?.length).map(m => `- Mirror \`${m.id}\` has no detected semantic doc yet.`).join('\n') || '- No obvious missing mirrors detected.'}
+${config.l3Lite.selectedFiles.length ? '' : '\n- No selected P0 files inferred; L3-Lite will not be enforced until `l3Lite.selectedFiles` is populated.'}
 
 ## Suggested Next Steps
 
@@ -257,6 +267,7 @@ console.log(`- project: ${project.name}`)
 console.log(`- type: ${project.type}`)
 console.log(`- languages: ${project.languages.join(', ') || 'unknown'}`)
 console.log(`- P0 candidates: ${classification.p0.length}`)
+console.log(`- selected P0 files: ${config.l3Lite.selectedFiles.length}`)
 console.log(`- mirrors: ${mirrors.length}`)
 console.log('')
 console.log(dryRun ? 'Dry run complete.' : 'FMP init complete.')

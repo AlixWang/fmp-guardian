@@ -39,7 +39,9 @@
   },
   "l3Lite": {
     "enabled": true,
-    "requiredFor": ["p0"],
+    "requiredFor": ["selected-p0"],
+    "selectedFiles": [],
+    "candidateLimit": 30,
     "maxLines": 6,
     "requiredTags": ["FMP", "MIRROR", "EXPORT", "CHECK"],
     "failOnMissing": false

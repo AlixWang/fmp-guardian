@@ -29,7 +29,7 @@ It keeps code facts and semantic mirrors aligned through:
 - sparse `AGENTS.md`
 - project-local `.fmp/config.json`
 - project-local `.fmp/mirror-matrix.yaml`
-- short L3-Lite file anchors for selected P0 files
+- short L3-Lite file anchors for files listed in `l3Lite.selectedFiles`
 - drift checks
 - tests/evals/check gates
 
@@ -72,7 +72,7 @@ Steps:
    - core domain
    - agent/workflow/retrieval/persistence subsystem
 
-5. Add L3-Lite only to selected P0 files, or produce a candidate list if confidence is low.
+5. Generate `l3Lite.selectedFiles` for high-signal P0 files. Add L3-Lite only when explicitly seeding.
 
 6. Report:
    - detected project type
@@ -103,7 +103,7 @@ Steps:
 1. Read `.fmp/config.json`.
 2. Read `.fmp/mirror-matrix.yaml`.
 3. Check changed P0 files.
-4. Verify L3-Lite anchors.
+4. Verify L3-Lite anchors for selected P0 files.
 5. Verify mirror docs were checked or updated.
 6. Verify tests/evals/checks were run or explain why not.
 7. Return PASS / WARN / FAIL.
@@ -166,6 +166,10 @@ Keep it short.
 Do not duplicate imports.  
 Do not explain implementation.  
 Do not create long file headers.
+
+`selected-p0` means only files listed in `.fmp/config.json` at `l3Lite.selectedFiles`
+require L3-Lite anchors. P0 path patterns still define the broader high-risk surface,
+but they are not all required to carry file headers unless `requiredFor` includes `p0`.
 
 ## Preferred Commands
 

@@ -468,14 +468,133 @@ export function quoteYaml(v) {
 }
 
 export function globToRegex(pattern) {
-  let s = normalize(pattern).replace(/[.+^${}()|[\]\\]/g, '\\$&')
-  s = s.replace(/\\\*\\\*/g, '.*')
-  s = s.replace(/\\\*/g, '[^/]*')
+  const normalized = normalize(pattern)
+  let s = ''
+  for (let i = 0; i < normalized.length; i += 1) {
+    const ch = normalized[i]
+    if (ch === '*') {
+      if (normalized[i + 1] === '*') {
+        s += '.*'
+        i += 1
+      }
+      else {
+        s += '[^/]*'
+      }
+    }
+    else {
+      s += ch.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    }
+  }
   return new RegExp(`^${s}$`)
 }
 
 export function matchesAny(file, patterns) {
   return patterns.some(p => globToRegex(p).test(normalize(file)))
+}
+
+export function parseSimpleMirrors(text) {
+  const mirrors = []
+  let cur = null
+  let section = null
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trimEnd()
+    const id = line.match(/^-\s+id:\s+(.+)$/) || line.match(/^\s+-\s+id:\s+(.+)$/)
+    if (id) {
+      if (cur) mirrors.push(cur)
+      cur = { id: id[1].trim(), code: [], docs: [], evals: [], sync_when: [] }
+      section = null
+      continue
+    }
+    if (!cur) continue
+    const sec = line.match(/^\s*(code|docs|evals|sync_when):\s*$/)
+    if (sec) {
+      section = sec[1]
+      continue
+    }
+    const item = line.match(/^\s+-\s+(.+)$/)
+    if (item && section && cur[section]) cur[section].push(item[1].trim())
+  }
+  if (cur) mirrors.push(cur)
+  return mirrors
+}
+
+export function loadMirrorMatrix(root, cfg) {
+  const matrixPath = path.join(root, cfg.mirrorMatrix || '.fmp/mirror-matrix.yaml')
+  return parseSimpleMirrors(readText(matrixPath))
+}
+
+export function inferMirrorIdForFile(file, mirrors = []) {
+  const normalized = normalize(file)
+  const matched = mirrors
+    .filter(m => (m.code || []).some(pattern => globToRegex(pattern).test(normalized)))
+    .sort((a, b) => {
+      const aLen = Math.max(...(a.code || ['']).map(c => c.length))
+      const bLen = Math.max(...(b.code || ['']).map(c => c.length))
+      return bLen - aLen
+    })
+  return matched[0]?.id || inferMirrorIdFromPath(file)
+}
+
+export function selectedP0Score(file, root = process.cwd()) {
+  const normalized = normalize(file)
+  const lower = normalized.toLowerCase()
+  const base = path.basename(lower)
+  const ext = path.extname(lower)
+  let score = 0
+
+  if (/\/(index|main|mod)\.(ts|tsx|js|jsx|mjs|py|go|rs|java|kt|cs|php|rb|swift)$/.test(lower)) score += 16
+  if (/(engine|worker|orchestrator|workflow|pipeline|state|store|schema|migration|repository|service|controller|handler|middleware|router|route|api|auth|permission|security|billing|payment|prompt|tool|eval|benchmark|golden|contract|protocol|event)/.test(lower)) score += 12
+  if (/(engine|worker|compress|transform|processor|renderer|parser|validator|adapter|client)\./.test(base)) score += 14
+  if (/(config|wrangler|next\.config|vite\.config|open-next\.config|package|workspace)/.test(lower)) score += 9
+  if (/\/(src|lib|internal|pkg|cmd)\//.test(lower)) score += 6
+  if (/\/(types|constants)\.(ts|tsx|js|jsx|mjs)$/.test(lower)) score += 5
+  if (/(worker|engine|schema|middleware|router|store|repository|service|controller|handler|types)\./.test(base)) score += 8
+  if (/\/index\.(ts|tsx|js|jsx|mjs)$/.test(lower)) score += 4
+  if (/\.(test|spec)\./.test(lower)) score += 6
+
+  const content = readText(path.join(root, normalized))
+  const exportCount = [...content.matchAll(/\bexport\b/g)].length
+  if (exportCount) score += Math.min(12, exportCount * 2)
+  if (/export\s+default|module\.exports|exports\./.test(content)) score += 4
+  if (/create|run|execute|dispatch|handle|process|validate|transform|compress|render|generate|parse/i.test(content)) score += 3
+
+  if (/\/(app|pages|routes)\/.*\/(layout|page|not-found|loading|error)\.(ts|tsx|js|jsx)$/.test(lower)) score -= 8
+  if (/\/routes\/.*\/index\.(ts|tsx|js|jsx)$/.test(lower)) score -= 10
+  if (/\/locales\/[^/]+\/index\.(ts|tsx|js|jsx)$/.test(lower)) score -= 8
+  if (/\/components\//.test(lower)) score -= 6
+  if (/\/(styles?|css|theme)\//.test(lower) || ['.css', '.scss', '.sass'].includes(ext)) score -= 10
+
+  return score
+}
+
+export function selectP0Files(root, cfg, opts = {}) {
+  const limit = Number(opts.limit ?? cfg.l3Lite?.candidateLimit ?? 30)
+  const files = listP0CodeFiles(root, cfg)
+  return files
+    .map(file => ({ file, score: selectedP0Score(file, root) }))
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.file.localeCompare(b.file))
+    .slice(0, limit)
+    .map(item => item.file)
+}
+
+export function listSelectedP0Files(root, cfg, opts = {}) {
+  const selected = cfg.l3Lite?.selectedFiles || []
+  const files = selected.length ? selected : selectP0Files(root, cfg, opts)
+  const p0Files = new Set(listP0CodeFiles(root, cfg))
+  return unique(files.map(normalize))
+    .filter(f => p0Files.has(f))
+    .filter(f => exists(path.join(root, f)))
+}
+
+export function l3RequiresAllP0(cfg) {
+  const requiredFor = cfg.l3Lite?.requiredFor || ['p0']
+  return cfg.l3Lite?.enabled !== false && requiredFor.includes('p0')
+}
+
+export function l3RequiresSelectedP0(cfg) {
+  const requiredFor = cfg.l3Lite?.requiredFor || ['p0']
+  return cfg.l3Lite?.enabled !== false && requiredFor.includes('selected-p0')
 }
 
 export function loadConfig(root) {
@@ -533,8 +652,8 @@ export function commentForFile(file, role, mirror, exportsValue, check) {
   return `/**\n${body.map(l => ` * ${l}`).join('\n')}\n */\n\n`
 }
 
-export function roleFromPath(file) {
-  const id = inferMirrorIdFromPath(file)
+export function roleFromPath(file, mirrorId = null) {
+  const id = mirrorId || inferMirrorIdFromPath(file)
   const base = path.basename(file)
   const label = {
     'agent-or-knowledge-system': 'agent / knowledge system file',

@@ -49,7 +49,7 @@ CLAUDE.md                    # optional compatibility shim
 - `AGENTS.md` is the primary low-noise agent entry.
 - `.fmp/config.json` stores project-local FMP rules.
 - `.fmp/mirror-matrix.yaml` maps code areas to semantic mirrors.
-- L3-Lite anchors are only for selected P0 files.
+- L3-Lite anchors are required only for `l3Lite.selectedFiles` when `requiredFor` is `["selected-p0"]`.
 - FMP checks help catch code/doc/eval drift.
 
 ## Commands
@@ -87,7 +87,11 @@ node .agents/skills/fmp-guardian/scripts/fmp-check.mjs --strict
 ```bash
 node .agents/skills/fmp-guardian/scripts/fmp-seed-l3.mjs
 node .agents/skills/fmp-guardian/scripts/fmp-seed-l3.mjs --write
+node .agents/skills/fmp-guardian/scripts/fmp-seed-l3.mjs --all-p0
 ```
+
+By default this command only targets `.fmp/config.json` `l3Lite.selectedFiles`.
+Use `--all-p0` only when broad file-header coverage is intentional.
 
 ### Generate sync plan
 
@@ -107,6 +111,7 @@ node .agents/skills/fmp-guardian/scripts/fmp-eval.mjs --run
 The initializer is conservative:
 
 - It does not add L3 to every file.
+- It stores selected L3 targets in `.fmp/config.json` under `l3Lite.selectedFiles`.
 - It does not create nested AGENTS.md everywhere.
 - It does not overwrite existing AGENTS.md unless it owns the generated block.
 - It marks missing mirrors as FMP debt instead of pretending they exist.

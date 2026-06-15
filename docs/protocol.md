@@ -31,3 +31,8 @@ FMP is a low-noise semantic synchronization protocol for code agents.
 ```
 
 L3-Lite must not explain implementation details.
+
+When `.fmp/config.json` uses `l3Lite.requiredFor: ["selected-p0"]`, only files in
+`l3Lite.selectedFiles` require these anchors. P0 patterns remain the broad
+high-risk surface; selected P0 is the smaller set of files worth pinning with
+headers.

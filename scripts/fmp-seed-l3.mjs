@@ -6,7 +6,9 @@ import {
   commentForFile,
   hasL3Lite,
   inferExports,
-  inferMirrorIdFromPath,
+  inferMirrorIdForFile,
+  listSelectedP0Files,
+  loadMirrorMatrix,
   listP0CodeFiles,
   loadConfig,
   parseArgs,
@@ -19,10 +21,13 @@ import {
 const args = parseArgs()
 const root = rootFromArgs(args)
 const write = Boolean(args.write)
-const limit = Number(args.limit || 50)
+const allP0 = Boolean(args['all-p0'])
 const cfg = loadConfig(root)
+const limit = args.limit ? Number(args.limit) : null
+const mirrors = loadMirrorMatrix(root, cfg)
 
-const files = listP0CodeFiles(root, cfg).slice(0, limit)
+const sourceFiles = allP0 ? listP0CodeFiles(root, cfg) : listSelectedP0Files(root, cfg)
+const files = limit ? sourceFiles.slice(0, limit) : sourceFiles
 const planned = []
 
 for (const f of files) {
@@ -30,8 +35,8 @@ for (const f of files) {
   const content = readText(full)
   if (hasL3Lite(content)) continue
 
-  const id = inferMirrorIdFromPath(f)
-  const role = roleFromPath(f)
+  const id = inferMirrorIdForFile(f, mirrors)
+  const role = roleFromPath(f, id)
   const mirror = `.fmp/mirror-matrix.yaml#${id}`
   const exportsValue = inferExports(f, root)
   const check = checkTextFromMirrorId(id)
@@ -54,10 +59,11 @@ for (const f of files) {
 console.log('FMP L3-Lite seed')
 console.log('')
 console.log(write ? 'Mode: write' : 'Mode: dry-run')
+console.log(`Scope: ${allP0 ? 'all-p0' : 'selected-p0'}`)
 console.log(`Candidates: ${planned.length}`)
 for (const f of planned) console.log(`- ${f}`)
 
 if (!write) {
   console.log('')
-  console.log('Re-run with --write to modify files.')
+  console.log('Re-run with --write to modify files. Use --all-p0 only when you intentionally want broad L3 coverage.')
 }

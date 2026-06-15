@@ -29,7 +29,7 @@ FMP keeps code facts and semantic mirrors aligned.
 
 - Root `AGENTS.md` is the primary agent instruction file.
 - `CLAUDE.md`, if present, should import or point to `AGENTS.md`.
-- P0 files may use L3-Lite anchors.
+- Only selected P0 files in `l3Lite.selectedFiles` should receive L3-Lite anchors by default.
 - Generated files and trivial files should not receive L3-Lite.
 - `.fmp/mirror-matrix.yaml` is the source of truth for code/document/eval synchronization.
 
