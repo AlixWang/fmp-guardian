@@ -37,6 +37,36 @@
       "**/vendor/**"
     ]
   },
+  "scan": {
+    "ignoredDirs": [
+      ".agent",
+      ".agents",
+      ".cache",
+      ".claude",
+      ".codex",
+      ".continue",
+      ".cursor",
+      ".fmp",
+      ".git",
+      ".hg",
+      ".idea",
+      ".iflow",
+      ".kiro",
+      ".next",
+      ".pnpm-store",
+      ".svn",
+      ".turbo",
+      ".vscode",
+      ".wrangler",
+      "__pycache__",
+      "build",
+      "coverage",
+      "dist",
+      "node_modules",
+      "target",
+      "vendor"
+    ]
+  },
   "l3Lite": {
     "enabled": true,
     "requiredFor": ["selected-p0"],

@@ -19,6 +19,9 @@ The project rules are local.
 Never hardcode paths from another project.
 Never assume `src/server`, `apps/web`, `spec`, or `evals` exist.
 Always discover first.
+Ignore common tool, agent, editor, generated, and cache directories during broad
+project scans. Installed skills and local agent metadata are not project semantic
+mirrors by default.
 
 ## What FMP Means
 

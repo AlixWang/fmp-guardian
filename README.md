@@ -50,6 +50,7 @@ CLAUDE.md                    # optional compatibility shim
 - `.fmp/config.json` stores project-local FMP rules.
 - `.fmp/mirror-matrix.yaml` maps code areas to semantic mirrors.
 - L3-Lite anchors are required only for `l3Lite.selectedFiles` when `requiredFor` is `["selected-p0"]`.
+- Project scans ignore common tool and agent metadata directories such as `.agents`, `.claude`, `.codex`, `.cursor`, `.fmp`, `.kiro`, `.vscode`, and build/cache outputs.
 - FMP checks help catch code/doc/eval drift.
 
 ## Commands

@@ -6,6 +6,7 @@ import {
   buildMirrorMatrix,
   buildProjectMap,
   classify,
+  DEFAULT_IGNORES,
   detectChecks,
   detectDocs,
   detectProject,
@@ -77,6 +78,9 @@ const config = {
       '**/__pycache__/**',
       '**/vendor/**',
     ],
+  },
+  scan: {
+    ignoredDirs: [...DEFAULT_IGNORES].sort(),
   },
   l3Lite: {
     enabled: true,

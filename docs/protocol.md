@@ -2,6 +2,11 @@
 
 FMP is a low-noise semantic synchronization protocol for code agents.
 
+Broad project scans exclude local tool and agent metadata directories by default,
+including `.agents`, `.claude`, `.codex`, `.cursor`, `.fmp`, `.kiro`, editor
+folders, dependency folders, and build/cache outputs. Root `AGENTS.md` and
+explicit `.fmp/*` files are still read when commands need them.
+
 ## Principles
 
 1. The skill is generic; project rules are local.

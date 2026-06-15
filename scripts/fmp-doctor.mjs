@@ -18,7 +18,7 @@ const args = parseArgs()
 const root = rootFromArgs(args)
 const cfg = loadConfig(root)
 
-const allFiles = walk(root)
+const allFiles = walk(root, cfg.scan || {})
 const agentDocs = allFiles.filter(f => path.basename(f) === 'AGENTS.md')
 const p0Files = listP0CodeFiles(root, cfg)
 const selectedP0Files = listSelectedP0Files(root, cfg)

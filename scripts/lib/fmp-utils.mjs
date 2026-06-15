@@ -17,6 +17,22 @@ export const DEFAULT_IGNORES = new Set([
   '__pycache__',
   'vendor',
   '.cache',
+  '.agents',
+  '.agent',
+  '.claude',
+  '.codex',
+  '.continue',
+  '.cursor',
+  '.fmp',
+  '.iflow',
+  '.kiro',
+  '.vscode',
+  '.idea',
+  '.pnpm-store',
+])
+
+export const DEFAULT_HIDDEN_ALLOWLIST = new Set([
+  '.github',
 ])
 
 export const CODE_EXTS = new Set([
@@ -72,6 +88,8 @@ export function writeText(file, content) {
 
 export function walk(root, opts = {}) {
   const maxFiles = opts.maxFiles ?? 30000
+  const ignores = new Set([...DEFAULT_IGNORES, ...(opts.ignoredDirs || [])])
+  const hiddenAllowlist = new Set([...DEFAULT_HIDDEN_ALLOWLIST, ...(opts.hiddenAllowlist || [])])
   const out = []
   function visit(dir) {
     if (out.length >= maxFiles) return
@@ -88,8 +106,8 @@ export function walk(root, opts = {}) {
       const rel = normalize(path.relative(root, full))
       if (!rel) continue
       if (ent.isDirectory()) {
-        if (DEFAULT_IGNORES.has(ent.name)) continue
-        if (ent.name.startsWith('.') && !['.github', '.agents', '.fmp'].includes(ent.name)) continue
+        if (ignores.has(ent.name) || ignores.has(rel)) continue
+        if (ent.name.startsWith('.') && !hiddenAllowlist.has(ent.name) && !hiddenAllowlist.has(rel)) continue
         visit(full)
       }
       else if (ent.isFile()) {
@@ -685,7 +703,7 @@ export function checkTextFromMirrorId(id) {
 }
 
 export function listP0CodeFiles(root, cfg) {
-  const files = walk(root)
+  const files = walk(root, cfg.scan || {})
   const p0 = cfg.paths?.p0 || []
   const exempt = cfg.paths?.exempt || []
   return files
