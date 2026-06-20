@@ -2,6 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import {
+  globToRegex,
   extractL3,
   hasL3Lite,
   l3RequiresAllP0,
@@ -9,10 +10,24 @@ import {
   listP0CodeFiles,
   listSelectedP0Files,
   loadConfig,
+  loadMirrorMatrix,
+  matchesAny,
   parseArgs,
   readText,
   rootFromArgs,
+  walk,
 } from './lib/fmp-utils.mjs'
+import {
+  architectureSnapshotText,
+  buildArchitectureSnapshot,
+  staleArchitectureDocs,
+} from './lib/fmp-architecture.mjs'
+import {
+  affectedMirrors,
+  codeFingerprint,
+  parseImpactFile,
+  resolveChangeSet,
+} from './lib/fmp-change.mjs'
 
 const args = parseArgs()
 const root = rootFromArgs(args)
@@ -35,6 +50,95 @@ else {
 const matrixPath = path.join(root, cfg.mirrorMatrix || '.fmp/mirror-matrix.yaml')
 if (!fs.existsSync(matrixPath)) {
   failures.push(`Missing mirror matrix: ${cfg.mirrorMatrix || '.fmp/mirror-matrix.yaml'}`)
+}
+
+const mirrors = loadMirrorMatrix(root, cfg)
+const allFiles = walk(root, cfg.scan || {})
+const architectureDocs = allFiles.filter(file =>
+  file === (cfg.architecture?.overview || 'docs/architecture/overview.md')
+  || file.startsWith(`${cfg.architecture?.moduleRoot || 'docs/architecture/modules'}/`))
+const pendingSemanticDocs = architectureDocs.filter(file => readText(path.join(root, file)).includes('FMP:SEMANTIC_REVIEW_PENDING'))
+if (pendingSemanticDocs.length) {
+  const msg = `Architecture semantic review is incomplete: ${pendingSemanticDocs.join(', ')}`
+  if (strict || cfg.enforcement?.semanticCompletion === 'fail') failures.push(msg)
+  else warnings.push(msg)
+}
+for (const mirror of mirrors) {
+  for (const doc of mirror.docs || []) {
+    const file = doc.split('#')[0]
+    if (!fs.existsSync(path.join(root, file))) {
+      const msg = `Mirror ${mirror.id} references missing doc: ${file}`
+      if (strict || cfg.enforcement?.staleReferences === 'fail') failures.push(msg)
+      else warnings.push(msg)
+    }
+  }
+  if (!(mirror.code || []).some(pattern => allFiles.some(file => globToRegex(pattern).test(file)))) {
+    const msg = `Mirror ${mirror.id} has no files matching its code patterns.`
+    if (strict || cfg.enforcement?.staleReferences === 'fail') failures.push(msg)
+    else warnings.push(msg)
+  }
+}
+
+const snapshotPath = path.join(root, cfg.architecture?.snapshot || '.fmp/architecture-snapshot.json')
+if (!fs.existsSync(snapshotPath)) {
+  const msg = `Missing architecture snapshot: ${path.relative(root, snapshotPath)}`
+  if (strict || cfg.enforcement?.snapshotDrift === 'fail') failures.push(msg)
+  else warnings.push(msg)
+}
+else {
+  const freshSnapshot = buildArchitectureSnapshot(root, cfg)
+  const expected = architectureSnapshotText(freshSnapshot)
+  const current = readText(snapshotPath)
+  if (current !== expected) {
+    const msg = 'Architecture snapshot is stale. Run fmp-scan --write.'
+    if (strict || cfg.enforcement?.snapshotDrift === 'fail') failures.push(msg)
+    else warnings.push(msg)
+  }
+  const staleDocs = staleArchitectureDocs(root, cfg, freshSnapshot)
+  if (staleDocs.length) {
+    const msg = `Architecture managed facts are stale: ${staleDocs.join(', ')}`
+    if (strict || cfg.enforcement?.snapshotDrift === 'fail') failures.push(msg)
+    else warnings.push(msg)
+  }
+}
+
+let changeSet = null
+try {
+  changeSet = resolveChangeSet(root, args, { strict })
+}
+catch (error) {
+  if (strict) failures.push(error.message)
+  else warnings.push(error.message)
+}
+
+if (changeSet && cfg.enforcement?.docSync === 'required-or-waiver') {
+  const exempt = cfg.paths?.exempt || []
+  const p0Patterns = cfg.paths?.p0 || []
+  const changedP0 = changeSet.files
+    .filter(file => matchesAny(file, p0Patterns))
+    .filter(file => !matchesAny(file, exempt))
+  const impacted = affectedMirrors(changedP0, mirrors)
+  for (const file of changedP0) {
+    if (!impacted.some(mirror => (mirror.code || []).some(pattern => globToRegex(pattern).test(file)))) {
+      failures.push(`Changed P0 file is not mapped to a semantic mirror: ${file}`)
+    }
+  }
+  const fingerprint = codeFingerprint(root, changeSet.baseCommit, changedP0)
+  const impactPath = path.join(root, cfg.changeDetection?.impactFile || '.fmp/impact.yaml')
+  const impact = parseImpactFile(impactPath)
+
+  for (const mirror of impacted) {
+    const changedDocs = (mirror.docs || []).filter(doc => changeSet.files.includes(doc.split('#')[0]))
+    if (changedDocs.length) continue
+    const waiver = impact?.waivers?.find(item => item.mirror === mirror.id)
+    const validWaiver = impact?.baseCommit === changeSet.baseCommit
+      && impact?.codeFingerprint === fingerprint
+      && waiver?.disposition === 'no-doc-impact'
+      && Boolean(waiver?.reason?.trim())
+    if (!validWaiver) {
+      failures.push(`P0 changes affect mirror ${mirror.id}, but no mapped doc changed and no current no-doc-impact waiver exists.`)
+    }
+  }
 }
 
 const p0Files = listP0CodeFiles(root, cfg)
@@ -87,6 +191,7 @@ console.log(`Selected P0 files: ${selectedP0Files.length}`)
 console.log(`Selected L3-Lite coverage: ${selectedAnchored}/${selectedP0Files.length}`)
 console.log(`All P0 L3-Lite coverage: ${anchored}/${p0Files.length}`)
 console.log(`L3-Lite policy: ${(cfg.l3Lite?.requiredFor || ['p0']).join(', ')}`)
+if (changeSet) console.log(`Changed files (${changeSet.mode}): ${changeSet.files.length}`)
 
 if (warnings.length) {
   console.log('')

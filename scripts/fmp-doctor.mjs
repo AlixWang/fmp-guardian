@@ -8,11 +8,13 @@ import {
   listP0CodeFiles,
   listSelectedP0Files,
   loadConfig,
+  loadMirrorMatrix,
   parseArgs,
   readText,
   rootFromArgs,
   walk,
 } from './lib/fmp-utils.mjs'
+import { architectureSnapshotText, buildArchitectureSnapshot, staleArchitectureDocs } from './lib/fmp-architecture.mjs'
 
 const args = parseArgs()
 const root = rootFromArgs(args)
@@ -31,6 +33,17 @@ const requireSelectedP0L3 = l3RequiresSelectedP0(cfg)
 const matrixPath = path.join(root, cfg.mirrorMatrix || '.fmp/mirror-matrix.yaml')
 const matrix = readText(matrixPath)
 const missingDocMarkers = (matrix.match(/docs:\s*\[\]/g) || []).length + (matrix.match(/docs:\n\s*\[\]/g) || []).length
+const mirrors = loadMirrorMatrix(root, cfg)
+const snapshotPath = path.join(root, cfg.architecture?.snapshot || '.fmp/architecture-snapshot.json')
+const snapshotExists = fs.existsSync(snapshotPath)
+const snapshotCurrent = snapshotExists
+  && readText(snapshotPath) === architectureSnapshotText(buildArchitectureSnapshot(root, cfg))
+const staleManagedDocs = staleArchitectureDocs(root, cfg, buildArchitectureSnapshot(root, cfg))
+const missingMirrorDocs = mirrors.flatMap(mirror => (mirror.docs || [])
+  .map(doc => ({ mirror: mirror.id, doc: doc.split('#')[0] })))
+  .filter(item => !fs.existsSync(path.join(root, item.doc)))
+const pendingSemanticDocs = allFiles.filter(file => /\.mdx?$/.test(file))
+  .filter(file => readText(path.join(root, file)).includes('FMP:SEMANTIC_REVIEW_PENDING'))
 
 console.log('# FMP Doctor')
 console.log('')
@@ -43,6 +56,10 @@ console.log('## Coverage')
 console.log(`- Root AGENTS.md: ${fs.existsSync(path.join(root, 'AGENTS.md')) ? 'OK' : 'MISSING'}`)
 console.log(`- Nested AGENTS.md: ${Math.max(0, agentDocs.length - 1)}`)
 console.log(`- Mirror matrix: ${fs.existsSync(matrixPath) ? 'OK' : 'MISSING'}`)
+console.log(`- Architecture snapshot: ${snapshotCurrent ? 'CURRENT' : snapshotExists ? 'STALE' : 'MISSING'}`)
+console.log(`- Architecture overview: ${fs.existsSync(path.join(root, cfg.architecture?.overview || 'docs/architecture/overview.md')) ? 'OK' : 'MISSING'}`)
+console.log(`- Pending semantic reviews: ${pendingSemanticDocs.length}`)
+console.log(`- Stale managed architecture docs: ${staleManagedDocs.length}`)
 console.log(`- P0 patterns: ${(cfg.paths?.p0 || []).length}`)
 console.log(`- P0 code files: ${p0Files.length}`)
 console.log(`- Selected P0 files: ${selectedP0Files.length}`)
@@ -68,6 +85,11 @@ if (requireSelectedP0L3 && !hasPersistedSelectedP0) debt.push('Persist reviewed 
 if (requireSelectedP0L3 && selectedP0Files.length === 0) debt.push('Populate l3Lite.selectedFiles or change l3Lite.requiredFor.')
 if (requireSelectedP0L3 && selectedAnchored.length < selectedP0Files.length) debt.push(`Add L3-Lite to selected P0 files. Missing: ${selectedP0Files.length - selectedAnchored.length}.`)
 if (missingDocMarkers) debt.push(`Some mirror entries have no semantic docs detected. Review mirror matrix.`)
+if (!snapshotExists) debt.push('Generate the architecture snapshot with fmp-scan --write.')
+else if (!snapshotCurrent) debt.push('Architecture snapshot is stale; refresh it and review affected docs.')
+for (const item of missingMirrorDocs) debt.push(`Mirror ${item.mirror} references missing doc ${item.doc}.`)
+if (pendingSemanticDocs.length) debt.push(`Complete agent semantic review in ${pendingSemanticDocs.length} architecture document(s).`)
+if (staleManagedDocs.length) debt.push(`Refresh deterministic facts in ${staleManagedDocs.length} architecture document(s).`)
 if (agentDocs.length > 12) debt.push(`Many AGENTS.md files detected (${agentDocs.length}). Consider pruning nested docs.`)
 
 if (debt.length) {

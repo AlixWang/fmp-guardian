@@ -36,7 +36,7 @@ export const DEFAULT_HIDDEN_ALLOWLIST = new Set([
 ])
 
 export const CODE_EXTS = new Set([
-  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs',
+  '.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs',
   '.py', '.go', '.rs', '.java', '.kt', '.kts',
   '.cs', '.php', '.rb', '.swift', '.c', '.cc', '.cpp', '.h', '.hpp',
 ])
@@ -173,7 +173,7 @@ export function inferBoundaryPattern(file) {
     if (i >= 0 && parts[i + 1]) {
       // Keep one subsystem after src/app/internal when meaningful.
       const srcI = lower.indexOf('src')
-      if (srcI >= i + 2 && parts[srcI + 1]) {
+      if (srcI >= i + 2 && parts[srcI + 2]) {
         return `${parts.slice(0, srcI + 2).join('/')}/**`
       }
       return `${parts.slice(0, i + 2).join('/')}/**`
@@ -184,7 +184,8 @@ export function inferBoundaryPattern(file) {
   for (const s of srcLike) {
     const i = lower.indexOf(s)
     if (i >= 0 && parts[i + 1]) {
-      return `${parts.slice(0, i + 2).join('/')}/**`
+      if (parts[i + 2]) return `${parts.slice(0, i + 2).join('/')}/**`
+      return `${parts.slice(0, i + 1).join('/')}/**`
     }
   }
 
@@ -257,7 +258,8 @@ export function detectProject(root, files) {
     if (CODE_EXTS.has(ext)) extCounts.set(ext, (extCounts.get(ext) || 0) + 1)
   }
   const langByExt = {
-    '.ts': 'TypeScript', '.tsx': 'TypeScript', '.js': 'JavaScript', '.jsx': 'JavaScript',
+    '.ts': 'TypeScript', '.tsx': 'TypeScript', '.mts': 'TypeScript', '.cts': 'TypeScript',
+    '.js': 'JavaScript', '.jsx': 'JavaScript', '.mjs': 'JavaScript', '.cjs': 'JavaScript',
     '.py': 'Python', '.go': 'Go', '.rs': 'Rust', '.java': 'Java', '.kt': 'Kotlin',
   }
   for (const [ext, count] of [...extCounts.entries()].sort((a, b) => b[1] - a[1])) {
@@ -519,7 +521,7 @@ export function parseSimpleMirrors(text) {
     const id = line.match(/^-\s+id:\s+(.+)$/) || line.match(/^\s+-\s+id:\s+(.+)$/)
     if (id) {
       if (cur) mirrors.push(cur)
-      cur = { id: id[1].trim(), code: [], docs: [], evals: [], sync_when: [] }
+      cur = { id: parseYamlScalar(id[1]), code: [], docs: [], evals: [], sync_when: [] }
       section = null
       continue
     }
@@ -530,10 +532,19 @@ export function parseSimpleMirrors(text) {
       continue
     }
     const item = line.match(/^\s+-\s+(.+)$/)
-    if (item && section && cur[section]) cur[section].push(item[1].trim())
+    if (item && section && cur[section]) cur[section].push(parseYamlScalar(item[1]))
   }
   if (cur) mirrors.push(cur)
   return mirrors
+}
+
+function parseYamlScalar(value) {
+  const text = value.trim()
+  if (text.startsWith('"') && text.endsWith('"')) {
+    try { return JSON.parse(text) }
+    catch { return text.slice(1, -1) }
+  }
+  return text.replace(/^'|'$/g, '')
 }
 
 export function loadMirrorMatrix(root, cfg) {

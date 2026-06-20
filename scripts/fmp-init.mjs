@@ -20,6 +20,11 @@ import {
   writeText,
   yamlString,
 } from './lib/fmp-utils.mjs'
+import {
+  buildArchitectureSnapshot,
+  syncArchitectureDocs,
+  writeArchitectureSnapshot,
+} from './lib/fmp-architecture.mjs'
 
 const args = parseArgs()
 const root = rootFromArgs(args)
@@ -27,6 +32,7 @@ const dryRun = Boolean(args['dry-run'])
 const createClaude = args.claude !== false
 const seedL3 = Boolean(args['seed-l3'])
 const writeModuleAgents = Boolean(args['write-module-agents'])
+const refreshMap = Boolean(args['refresh-map'])
 
 const files = walk(root)
 const project = detectProject(root, files)
@@ -41,9 +47,10 @@ const matrixPath = path.join(fmpDir, 'mirror-matrix.yaml')
 const statusPath = path.join(fmpDir, 'status.md')
 const agentsPath = path.join(root, 'AGENTS.md')
 const claudePath = path.join(root, 'CLAUDE.md')
+const existingConfig = fs.existsSync(configPath) ? JSON.parse(readText(configPath)) : null
 
-const config = {
-  version: '0.1',
+const defaults = {
+  version: '0.2',
   project: {
     name: project.name,
     type: project.type,
@@ -98,13 +105,47 @@ const config = {
     nestedOnlyFor: ['p0-boundary', 'package-boundary', 'service-boundary'],
   },
   mirrorMatrix: '.fmp/mirror-matrix.yaml',
+  architecture: {
+    snapshot: '.fmp/architecture-snapshot.json',
+    overview: docs.designDocs.find(file => /architecture/i.test(file)) || 'docs/architecture/overview.md',
+    moduleRoot: 'docs/architecture/modules',
+    maxModules: 12,
+    managedBlocks: true,
+  },
+  changeDetection: {
+    impactFile: '.fmp/impact.yaml',
+    baseEnv: 'FMP_BASE_REF',
+  },
+  enforcement: {
+    docSync: 'required-or-waiver',
+    snapshotDrift: 'fail',
+    staleReferences: 'fail',
+    semanticCompletion: 'fail',
+  },
   checks: {
     commands,
   },
 }
-config.l3Lite.selectedFiles = selectP0Files(root, config)
+const config = mergeConfig(defaults, existingConfig)
+config.version = '0.2'
+config.l3Lite.selectedFiles = existingConfig?.l3Lite?.selectedFiles?.length
+  ? existingConfig.l3Lite.selectedFiles
+  : selectP0Files(root, config)
 
-const matrixYaml = `version: 0.1
+const initialArchitecture = buildArchitectureSnapshot(root, config)
+const moduleDocByRoot = new Map(initialArchitecture.boundaries
+  .filter(boundary => boundary.root !== '.')
+  .slice(0, config.architecture.maxModules)
+  .map(boundary => [boundary.root, path.join(config.architecture.moduleRoot, `${boundary.id}.md`).split(path.sep).join('/')]))
+for (const mirror of mirrors) {
+  if (mirror.docs?.length) continue
+  const moduleDocs = unique((mirror.code || []).flatMap(pattern => [...moduleDocByRoot.entries()]
+    .filter(([rootPath]) => pattern === rootPath || pattern.startsWith(`${rootPath}/`))
+    .map(([, doc]) => doc)))
+  mirror.docs = moduleDocs.length ? moduleDocs : [config.architecture.overview]
+}
+
+const matrixYaml = `version: 0.2
 
 mirrors:
 ${mirrors.length ? yamlString(mirrors, 2) : '  []'}
@@ -123,9 +164,10 @@ FMP keeps code facts and semantic mirrors aligned.
 1. Read this file before modifying code.
 2. Read \`.fmp/config.json\` for project-specific FMP rules.
 3. Read \`.fmp/mirror-matrix.yaml\` before changing P0 paths.
-4. For files with L3-Lite headers, follow their \`[MIRROR]\` and \`[CHECK]\` instructions.
-5. Behavior changes must update the matching semantic mirror.
-6. Do not create nested \`AGENTS.md\` unless the directory is a package, service, or P0 architecture boundary.
+4. Keep \`.fmp/architecture-snapshot.json\` synchronized with architecture facts.
+5. For files with L3-Lite headers, follow their \`[MIRROR]\` and \`[CHECK]\` instructions.
+6. Behavior changes must update the matching semantic mirror or carry a current \`.fmp/impact.yaml\` waiver.
+7. Do not create nested \`AGENTS.md\` unless the directory is a package, service, or P0 architecture boundary.
 
 ## Project Map
 
@@ -189,6 +231,8 @@ Generated: ${new Date().toISOString()}
 - P0 pattern candidates: ${classification.p0.length}
 - P1 pattern candidates: ${classification.p1.length}
 - Selected P0 files: ${config.l3Lite.selectedFiles.length}
+- Architecture boundaries: ${buildArchitectureSnapshot(root, config).boundaries.length}
+- Architecture overview: ${config.architecture.overview}
 
 ## Selected P0
 
@@ -198,13 +242,15 @@ ${config.l3Lite.selectedFiles.length ? config.l3Lite.selectedFiles.slice(0, 30).
 
 ${mirrors.filter(m => !m.docs?.length).map(m => `- Mirror \`${m.id}\` has no detected semantic doc yet.`).join('\n') || '- No obvious missing mirrors detected.'}
 ${config.l3Lite.selectedFiles.length ? '' : '\n- No selected P0 files inferred; L3-Lite will not be enforced until `l3Lite.selectedFiles` is populated.'}
+- Architecture semantic blocks require agent review before strict enforcement can pass.
 
 ## Suggested Next Steps
 
 1. Review \`.fmp/config.json\`.
 2. Review \`.fmp/mirror-matrix.yaml\`.
-3. Run \`fmp-doctor\`.
-4. Seed L3-Lite only for selected P0 files.
+3. Review the FMP-managed architecture blocks and resolve open questions.
+4. Run \`fmp-doctor\` and \`fmp-check --strict\`.
+5. Seed L3-Lite only for selected P0 files.
 `
 
 const planned = [
@@ -221,8 +267,10 @@ for (const p of planned) console.log(`- ${path.relative(root, p)}`)
 if (!dryRun) {
   fs.mkdirSync(fmpDir, { recursive: true })
   writeJson(configPath, config)
-  writeText(matrixPath, matrixYaml)
+  if (!fs.existsSync(matrixPath) || refreshMap) writeText(matrixPath, matrixYaml)
   writeText(statusPath, status)
+
+  syncArchitectureDocs(root, config, initialArchitecture)
 
   if (!fs.existsSync(agentsPath)) {
     writeText(agentsPath, agentsContent)
@@ -263,6 +311,9 @@ See \`.fmp/mirror-matrix.yaml\`.
       }
     }
   }
+
+  const finalSnapshot = buildArchitectureSnapshot(root, config)
+  writeArchitectureSnapshot(path.join(root, config.architecture.snapshot), finalSnapshot)
 }
 
 console.log('')
@@ -273,6 +324,7 @@ console.log(`- languages: ${project.languages.join(', ') || 'unknown'}`)
 console.log(`- P0 candidates: ${classification.p0.length}`)
 console.log(`- selected P0 files: ${config.l3Lite.selectedFiles.length}`)
 console.log(`- mirrors: ${mirrors.length}`)
+console.log(`- architecture overview: ${config.architecture.overview}`)
 console.log('')
 console.log(dryRun ? 'Dry run complete.' : 'FMP init complete.')
 
@@ -280,4 +332,15 @@ if (seedL3) {
   console.log('')
   console.log('Run this to seed L3-Lite anchors:')
   console.log('node .agents/skills/fmp-guardian/scripts/fmp-seed-l3.mjs --write')
+}
+
+function mergeConfig(defaultValue, existingValue) {
+  if (Array.isArray(defaultValue)) return Array.isArray(existingValue) ? existingValue : defaultValue
+  if (!defaultValue || typeof defaultValue !== 'object') return existingValue ?? defaultValue
+  const out = { ...defaultValue }
+  if (!existingValue || typeof existingValue !== 'object') return out
+  for (const [key, value] of Object.entries(existingValue)) {
+    out[key] = key in defaultValue ? mergeConfig(defaultValue[key], value) : value
+  }
+  return out
 }

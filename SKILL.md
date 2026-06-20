@@ -32,6 +32,8 @@ It keeps code facts and semantic mirrors aligned through:
 - sparse `AGENTS.md`
 - project-local `.fmp/config.json`
 - project-local `.fmp/mirror-matrix.yaml`
+- deterministic `.fmp/architecture-snapshot.json`
+- FMP-managed architecture overview and sparse module pages
 - short L3-Lite file anchors for files listed in `l3Lite.selectedFiles`
 - drift checks
 - tests/evals/check gates
@@ -66,6 +68,8 @@ Steps:
    - `.fmp/config.json`
    - `.fmp/mirror-matrix.yaml`
    - `.fmp/status.md`
+   - `.fmp/architecture-snapshot.json`
+   - an architecture overview and sparse module pages
    - optional `CLAUDE.md` compatibility shim
 
 4. Seed sparse module docs only for real boundaries:
@@ -75,9 +79,14 @@ Steps:
    - core domain
    - agent/workflow/retrieval/persistence subsystem
 
-5. Generate `l3Lite.selectedFiles` for high-signal P0 files. Add L3-Lite only when explicitly seeding.
+5. Read the architecture snapshot and relevant source evidence. Complete the nested
+   `FMP:SEMANTIC:*` blocks with responsibilities, runtime flows, state/data ownership,
+   external systems, and constraints only when those claims are supported by evidence.
+   Remove every `FMP:SEMANTIC_REVIEW_PENDING` marker. Do not edit deterministic facts.
 
-6. Report:
+6. Generate `l3Lite.selectedFiles` for high-signal P0 files. Add L3-Lite only when explicitly seeding.
+
+7. Report:
    - detected project type
    - generated files
    - P0/P1/P2 classification
@@ -91,11 +100,13 @@ Use when the user proposes or performs design/architecture changes.
 Steps:
 
 1. Summarize the design decision.
-2. Map affected code areas using `.fmp/mirror-matrix.yaml`.
-3. Identify semantic mirrors that need updates.
-4. Identify checks/evals likely required.
-5. Produce a sync plan before editing broad areas.
-6. Apply updates only to relevant local project files.
+2. Resolve the Git comparison base and inspect changed files.
+3. Map affected code areas using `.fmp/mirror-matrix.yaml`.
+4. Refresh the architecture snapshot and inspect structural deltas.
+5. Update affected `FMP:SEMANTIC:*` blocks. Preserve deterministic facts and human prose.
+6. If no mapped doc needs a change, write a precise `no-doc-impact` reason to the
+   current `.fmp/impact.yaml`; never reuse a stale waiver.
+7. Identify and run relevant checks/evals.
 
 ### Mode: check
 
@@ -106,10 +117,12 @@ Steps:
 1. Read `.fmp/config.json`.
 2. Read `.fmp/mirror-matrix.yaml`.
 3. Check changed P0 files.
-4. Verify L3-Lite anchors for selected P0 files.
-5. Verify mirror docs were checked or updated.
-6. Verify tests/evals/checks were run or explain why not.
-7. Return PASS / WARN / FAIL.
+4. Verify the architecture snapshot is current.
+5. Verify L3-Lite anchors for selected P0 files.
+6. Require each affected mirror to have a changed mapped doc or a fingerprint-matched waiver.
+7. Verify stale mirror links and missing architecture docs.
+8. Verify tests/evals/checks were run or explain why not.
+9. Return PASS / WARN / FAIL.
 
 ### Mode: doctor
 
@@ -122,7 +135,8 @@ Steps:
 3. Measure P0 L3-Lite coverage.
 4. Detect stale mirror links.
 5. Detect missing docs for high-risk modules.
-6. Recommend minimal repairs.
+6. Detect stale architecture snapshots and unmapped boundaries.
+7. Recommend minimal repairs.
 
 ## P0 Heuristics
 
@@ -180,9 +194,10 @@ When available in the project:
 
 ```bash
 node .agents/skills/fmp-guardian/scripts/fmp-init.mjs
+node .agents/skills/fmp-guardian/scripts/fmp-scan.mjs --write
 node .agents/skills/fmp-guardian/scripts/fmp-doctor.mjs
 node .agents/skills/fmp-guardian/scripts/fmp-check.mjs
-node .agents/skills/fmp-guardian/scripts/fmp-sync-plan.mjs "design decision"
+node .agents/skills/fmp-guardian/scripts/fmp-sync-plan.mjs --write-impact "design decision"
 node .agents/skills/fmp-guardian/scripts/fmp-seed-l3.mjs --write
 node .agents/skills/fmp-guardian/scripts/fmp-eval.mjs
 ```

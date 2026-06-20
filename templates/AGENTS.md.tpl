@@ -9,9 +9,10 @@ FMP keeps code facts and semantic mirrors aligned.
 1. Read this file before modifying code.
 2. Read `.fmp/config.json` for project-specific FMP rules.
 3. Read `.fmp/mirror-matrix.yaml` before changing P0 paths.
-4. For files with L3-Lite headers, follow their `[MIRROR]` and `[CHECK]` instructions.
-5. Behavior changes must update the matching semantic mirror.
-6. Do not create nested `AGENTS.md` unless the directory is a package, service, or P0 architecture boundary.
+4. Keep `.fmp/architecture-snapshot.json` synchronized with architecture facts.
+5. For files with L3-Lite headers, follow their `[MIRROR]` and `[CHECK]` instructions.
+6. Behavior changes must update the matching semantic mirror or carry a current `.fmp/impact.yaml` waiver.
+7. Do not create nested `AGENTS.md` unless the directory is a package, service, or P0 architecture boundary.
 
 ## Project Map
 

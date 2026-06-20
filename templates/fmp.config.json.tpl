@@ -1,5 +1,5 @@
 {
-  "version": "0.1",
+  "version": "0.2",
   "project": {
     "name": "{{PROJECT_NAME}}",
     "type": "{{PROJECT_TYPE}}",
@@ -83,6 +83,23 @@
     "nestedOnlyFor": ["p0-boundary", "package-boundary", "service-boundary"]
   },
   "mirrorMatrix": ".fmp/mirror-matrix.yaml",
+  "architecture": {
+    "snapshot": ".fmp/architecture-snapshot.json",
+    "overview": "docs/architecture/overview.md",
+    "moduleRoot": "docs/architecture/modules",
+    "maxModules": 12,
+    "managedBlocks": true
+  },
+  "changeDetection": {
+    "impactFile": ".fmp/impact.yaml",
+    "baseEnv": "FMP_BASE_REF"
+  },
+  "enforcement": {
+    "docSync": "required-or-waiver",
+    "snapshotDrift": "fail",
+    "staleReferences": "fail",
+    "semanticCompletion": "fail"
+  },
   "checks": {
     "commands": {{CHECK_COMMANDS_JSON}}
   }

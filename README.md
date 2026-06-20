@@ -25,6 +25,7 @@ Optional: add commands to your root `package.json`:
 {
   "scripts": {
     "fmp:init": "node .agents/skills/fmp-guardian/scripts/fmp-init.mjs",
+    "fmp:scan": "node .agents/skills/fmp-guardian/scripts/fmp-scan.mjs",
     "fmp:check": "node .agents/skills/fmp-guardian/scripts/fmp-check.mjs",
     "fmp:doctor": "node .agents/skills/fmp-guardian/scripts/fmp-doctor.mjs",
     "fmp:seed-l3": "node .agents/skills/fmp-guardian/scripts/fmp-seed-l3.mjs --write",
@@ -41,7 +42,10 @@ AGENTS.md
 CLAUDE.md                    # optional compatibility shim
 .fmp/config.json
 .fmp/mirror-matrix.yaml
+.fmp/architecture-snapshot.json
 .fmp/status.md
+docs/architecture/overview.md
+docs/architecture/modules/*.md   # only for detected boundaries
 ```
 
 ## Main ideas
@@ -49,6 +53,9 @@ CLAUDE.md                    # optional compatibility shim
 - `AGENTS.md` is the primary low-noise agent entry.
 - `.fmp/config.json` stores project-local FMP rules.
 - `.fmp/mirror-matrix.yaml` maps code areas to semantic mirrors.
+- `.fmp/architecture-snapshot.json` is a deterministic architecture fact baseline.
+- Architecture docs separate deterministic FMP blocks from nested agent-reviewed
+  semantic blocks; human prose and reviewed semantics survive scanner refreshes.
 - L3-Lite anchors are required only for `l3Lite.selectedFiles` when `requiredFor` is `["selected-p0"]`.
 - Project scans ignore common tool and agent metadata directories such as `.agents`, `.claude`, `.codex`, `.cursor`, `.fmp`, `.kiro`, `.vscode`, and build/cache outputs.
 - FMP checks help catch code/doc/eval drift.
@@ -68,7 +75,29 @@ Useful flags:
 --no-claude
 --seed-l3
 --write-module-agents
+--upgrade
+--refresh-map
 ```
+
+Re-running initialization preserves existing configuration, mirror mappings, and
+human-authored documentation. Use `--refresh-map` only when inferred mirror paths
+should replace the current matrix. `--upgrade` adds v0.2 defaults without replacing
+the matrix.
+
+### Scan architecture facts
+
+```bash
+node .agents/skills/fmp-guardian/scripts/fmp-scan.mjs --write
+node .agents/skills/fmp-guardian/scripts/fmp-scan.mjs --check
+```
+
+The generic scanner detects manifests, applications, packages, services, entrypoints,
+docs, and checks. Node/TypeScript projects also receive import/export and
+cross-boundary dependency analysis.
+
+Initialization marks semantic sections as pending. The FMP agent must replace those
+markers with evidence-backed system purpose, flows, ownership, interactions, and
+constraints before strict checks pass.
 
 ### Diagnose
 
@@ -81,7 +110,12 @@ node .agents/skills/fmp-guardian/scripts/fmp-doctor.mjs
 ```bash
 node .agents/skills/fmp-guardian/scripts/fmp-check.mjs
 node .agents/skills/fmp-guardian/scripts/fmp-check.mjs --strict
+FMP_BASE_REF=origin/main node .agents/skills/fmp-guardian/scripts/fmp-check.mjs --strict
 ```
+
+For every changed P0 mirror, strict mode requires either a changed mapped document
+or a current `no-doc-impact` waiver. CI must provide `--base` or `FMP_BASE_REF`;
+the checker never guesses a CI comparison range.
 
 ### Seed L3-Lite anchors
 
@@ -98,7 +132,17 @@ Use `--all-p0` only when broad file-header coverage is intentional.
 
 ```bash
 node .agents/skills/fmp-guardian/scripts/fmp-sync-plan.mjs "change writer agent tool permissions"
+node .agents/skills/fmp-guardian/scripts/fmp-sync-plan.mjs --base origin/main --write-impact "internal refactor"
 ```
+
+`--write-impact` writes `.fmp/impact.yaml` with the exact base commit and P0 content
+fingerprint. Add a waiver only when mapped architecture or public behavior did not
+change. Any subsequent P0 edit invalidates it.
+
+### CI
+
+Use `templates/fmp-ci.yml.tpl` for GitHub Actions, or run the equivalent command in
+another CI system with `FMP_BASE_REF` set to the pull request base commit.
 
 ### Plan or run checks/evals
 
@@ -115,4 +159,5 @@ The initializer is conservative:
 - It stores selected L3 targets in `.fmp/config.json` under `l3Lite.selectedFiles`.
 - It does not create nested AGENTS.md everywhere.
 - It does not overwrite existing AGENTS.md unless it owns the generated block.
+- It only replaces FMP-managed architecture document blocks.
 - It marks missing mirrors as FMP debt instead of pretending they exist.

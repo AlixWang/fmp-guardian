@@ -22,7 +22,30 @@ explicit `.fmp/*` files are still read when commands need them.
 - L2: sparse module `AGENTS.md` only for real architecture boundaries
 - L3: short L3-Lite anchors for selected P0 files
 - Mirror: `.fmp/mirror-matrix.yaml`
+- Fact baseline: `.fmp/architecture-snapshot.json`
+- Semantic docs: FMP-managed blocks in the architecture overview and sparse module pages
+- Change evidence: `.fmp/impact.yaml`
 - Gate: `fmp-check`, project tests, and evals
+
+## Architecture Evolution Gate
+
+The scanner records deterministic architecture facts without timestamps. A stale
+snapshot means repository boundaries, entrypoints, public exports, dependencies,
+docs, or checks changed without refreshing the baseline.
+
+For each changed P0 mirror, the gate accepts one of two outcomes:
+
+1. At least one mapped semantic document changed.
+2. `.fmp/impact.yaml` contains a non-empty `no-doc-impact` reason whose base commit
+   and code fingerprint match the current change set.
+
+The impact record is branch-local evidence, not a permanent exemption. Any further
+P0 edit invalidates its fingerprint. Strict CI checks require an explicit base ref.
+
+Outer FMP document blocks contain deterministic scanner facts. Nested
+`FMP:SEMANTIC:*` blocks are agent-reviewed and survive scanner refreshes. Strict mode
+rejects `FMP:SEMANTIC_REVIEW_PENDING`; content outside the outer markers remains
+human-owned.
 
 ## L3-Lite
 
