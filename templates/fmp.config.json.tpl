@@ -74,7 +74,10 @@
     "candidateLimit": 30,
     "maxLines": 6,
     "requiredTags": ["FMP", "MIRROR", "EXPORT", "CHECK"],
-    "failOnMissing": false
+    "failOnMissing": false,
+    "failOnInvalidMirror": false,
+    "failOnMirrorMismatch": false,
+    "failOnStaleExport": false
   },
   "agentsDocs": {
     "maxRootBytes": 24000,
@@ -98,9 +101,11 @@
     "docSync": "required-or-waiver",
     "snapshotDrift": "fail",
     "staleReferences": "fail",
-    "semanticCompletion": "fail"
+    "semanticCompletion": "fail",
+    "checkEvidence": "fail"
   },
   "checks": {
-    "commands": {{CHECK_COMMANDS_JSON}}
+    "commands": {{CHECK_COMMANDS_JSON}},
+    "evidenceFile": ".fmp/check-evidence.json"
   }
 }

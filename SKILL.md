@@ -104,8 +104,9 @@ Steps:
 3. Map affected code areas using `.fmp/mirror-matrix.yaml`.
 4. Refresh the architecture snapshot and inspect structural deltas.
 5. Update affected `FMP:SEMANTIC:*` blocks. Preserve deterministic facts and human prose.
-6. If no mapped doc needs a change, write a precise `no-doc-impact` reason to the
-   current `.fmp/impact.yaml`; never reuse a stale waiver.
+6. If no mapped `FMP:SEMANTIC:*` block needs a change, write a precise
+   `no-doc-impact` reason to the current `.fmp/impact.yaml`; never reuse a stale
+   waiver.
 7. Identify and run relevant checks/evals.
 
 ### Mode: check
@@ -119,7 +120,8 @@ Steps:
 3. Check changed P0 files.
 4. Verify the architecture snapshot is current.
 5. Verify L3-Lite anchors for selected P0 files.
-6. Require each affected mirror to have a changed mapped doc or a fingerprint-matched waiver.
+6. Require each affected mirror to have a changed mapped `FMP:SEMANTIC:*` block
+   or a fingerprint-matched waiver.
 7. Verify stale mirror links and missing architecture docs.
 8. Verify tests/evals/checks were run or explain why not.
 9. Return PASS / WARN / FAIL.

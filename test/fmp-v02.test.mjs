@@ -5,6 +5,7 @@ import path from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { buildMirrorMatrix, classify, detectDocs, walk } from '../scripts/lib/fmp-utils.mjs'
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -48,7 +49,15 @@ test('strict check requires a mapped doc update for changed P0 code', () => {
   assert.notEqual(failed.status, 0)
   assert.match(failed.stdout + failed.stderr, /no mapped doc changed/)
 
-  fs.appendFileSync(path.join(root, 'docs/architecture/modules/packages-core.md'), '\nUpdated architecture behavior.\n')
+  const moduleDoc = path.join(root, 'docs/architecture/modules/packages-core.md')
+  fs.appendFileSync(moduleDoc, '\nUpdated architecture behavior outside the managed block.\n')
+  run('scripts/fmp-eval.mjs', ['--root', root, '--run'])
+  const outsideBlock = invoke('scripts/fmp-check.mjs', ['--root', root, '--strict'])
+  assert.notEqual(outsideBlock.status, 0)
+  assert.match(outsideBlock.stdout + outsideBlock.stderr, /outside FMP semantic blocks/)
+
+  fs.writeFileSync(moduleDoc, fs.readFileSync(moduleDoc, 'utf8')
+    .replace('Reviewed from fixture source evidence.', 'Reviewed from fixture source evidence. Updated architecture behavior.'))
   const passed = invoke('scripts/fmp-check.mjs', ['--root', root, '--strict'])
   assert.equal(passed.status, 0, passed.stdout + passed.stderr)
 })
@@ -69,6 +78,7 @@ test('a current no-doc-impact waiver satisfies the gate and stale fingerprints f
     'waivers: []',
     'waivers:\n  - mirror: general-architecture\n    disposition: no-doc-impact\n    reason: "Internal implementation only"',
   ))
+  run('scripts/fmp-eval.mjs', ['--root', root, '--run'])
   let result = invoke('scripts/fmp-check.mjs', ['--root', root, '--strict'])
   assert.equal(result.status, 0, result.stdout + result.stderr)
 
@@ -76,6 +86,115 @@ test('a current no-doc-impact waiver satisfies the gate and stale fingerprints f
   result = invoke('scripts/fmp-check.mjs', ['--root', root, '--strict'])
   assert.notEqual(result.status, 0)
   assert.match(result.stdout + result.stderr, /no current no-doc-impact waiver/)
+})
+
+test('strict check requires current configured check evidence for changed P0 code', () => {
+  const root = fixture()
+  run('scripts/fmp-init.mjs', ['--root', root])
+  completeSemanticDocs(root)
+  run('scripts/fmp-seed-l3.mjs', ['--root', root, '--write'])
+  commit(root, 'baseline')
+
+  const code = path.join(root, 'packages/core/src/service.ts')
+  fs.writeFileSync(code, fs.readFileSync(code, 'utf8').replace('service = true', 'service = false'))
+  run('scripts/fmp-scan.mjs', ['--root', root, '--write'])
+  const moduleDoc = path.join(root, 'docs/architecture/modules/packages-core.md')
+  fs.writeFileSync(moduleDoc, fs.readFileSync(moduleDoc, 'utf8')
+    .replace('Reviewed from fixture source evidence.', 'Reviewed from fixture source evidence. Evidence gate update.'))
+
+  let result = invoke('scripts/fmp-check.mjs', ['--root', root, '--strict'])
+  assert.notEqual(result.status, 0)
+  assert.match(result.stdout + result.stderr, /Check\/eval evidence problem/)
+
+  run('scripts/fmp-eval.mjs', ['--root', root, '--run'])
+  result = invoke('scripts/fmp-check.mjs', ['--root', root, '--strict'])
+  assert.equal(result.status, 0, result.stdout + result.stderr)
+})
+
+test('strict check rejects policy weakening in the current branch', () => {
+  const root = fixture()
+  run('scripts/fmp-init.mjs', ['--root', root])
+  completeSemanticDocs(root)
+  run('scripts/fmp-seed-l3.mjs', ['--root', root, '--write'])
+  commit(root, 'baseline')
+
+  const code = path.join(root, 'packages/core/src/service.ts')
+  fs.writeFileSync(code, fs.readFileSync(code, 'utf8').replace('service = true', 'service = false'))
+  run('scripts/fmp-scan.mjs', ['--root', root, '--write'])
+  const configPath = path.join(root, '.fmp/config.json')
+  const config = json(root, '.fmp/config.json')
+  config.paths.p0 = []
+  config.l3Lite.selectedFiles = []
+  config.enforcement.docSync = 'off'
+  config.enforcement.checkEvidence = 'warn'
+  config.checks.commands = {}
+  fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`)
+
+  run('scripts/fmp-eval.mjs', ['--root', root, '--run'])
+  const result = invoke('scripts/fmp-check.mjs', ['--root', root, '--strict'])
+  assert.notEqual(result.status, 0)
+  assert.match(result.stdout + result.stderr, /fmp-policy|general-architecture/)
+})
+
+test('scanner-only deterministic doc refresh does not satisfy semantic sync', () => {
+  const root = fixture()
+  run('scripts/fmp-init.mjs', ['--root', root])
+  completeSemanticDocs(root)
+  run('scripts/fmp-seed-l3.mjs', ['--root', root, '--write'])
+  commit(root, 'baseline')
+
+  const code = path.join(root, 'packages/core/src/service.ts')
+  fs.appendFileSync(code, 'export const addedPublicContract = true\n')
+  run('scripts/fmp-scan.mjs', ['--root', root, '--write'])
+  run('scripts/fmp-eval.mjs', ['--root', root, '--run'])
+  const result = invoke('scripts/fmp-check.mjs', ['--root', root, '--strict'])
+  assert.notEqual(result.status, 0)
+  assert.match(result.stdout + result.stderr, /outside FMP semantic blocks/)
+})
+
+test('strict check rejects forged check evidence', () => {
+  const root = fixture()
+  run('scripts/fmp-init.mjs', ['--root', root])
+  completeSemanticDocs(root)
+  run('scripts/fmp-seed-l3.mjs', ['--root', root, '--write'])
+  commit(root, 'baseline')
+
+  const code = path.join(root, 'packages/core/src/service.ts')
+  fs.writeFileSync(code, fs.readFileSync(code, 'utf8').replace('service = true', 'service = false'))
+  run('scripts/fmp-scan.mjs', ['--root', root, '--write'])
+  const moduleDoc = path.join(root, 'docs/architecture/modules/packages-core.md')
+  fs.writeFileSync(moduleDoc, fs.readFileSync(moduleDoc, 'utf8')
+    .replace('Reviewed from fixture source evidence.', 'Reviewed from fixture source evidence. Forged evidence test.'))
+  write(root, '.fmp/check-evidence.json', JSON.stringify({
+    version: '0.2',
+    startedAt: '2999-01-01T00:00:00.000Z',
+    completedAt: '2999-01-01T00:00:01.000Z',
+    runs: [{ name: 'test', command: 'node --test', status: 0, signal: null, durationMs: 1 }],
+  }, null, 2))
+
+  const result = invoke('scripts/fmp-check.mjs', ['--root', root, '--strict'])
+  assert.notEqual(result.status, 0)
+  assert.match(result.stdout + result.stderr, /future|codeFingerprint|commandsFingerprint/)
+})
+
+test('strict check rejects stale L3 export summaries on changed P0 files', () => {
+  const root = fixture()
+  run('scripts/fmp-init.mjs', ['--root', root])
+  completeSemanticDocs(root)
+  run('scripts/fmp-seed-l3.mjs', ['--root', root, '--write'])
+  commit(root, 'baseline')
+
+  const code = path.join(root, 'packages/core/src/service.ts')
+  fs.appendFileSync(code, 'export const addedPublicContract = true\n')
+  run('scripts/fmp-scan.mjs', ['--root', root, '--write'])
+  const moduleDoc = path.join(root, 'docs/architecture/modules/packages-core.md')
+  fs.writeFileSync(moduleDoc, fs.readFileSync(moduleDoc, 'utf8')
+    .replace('Reviewed from fixture source evidence.', 'Reviewed from fixture source evidence. L3 stale export test.'))
+  run('scripts/fmp-eval.mjs', ['--root', root, '--run'])
+
+  const result = invoke('scripts/fmp-check.mjs', ['--root', root, '--strict'])
+  assert.notEqual(result.status, 0)
+  assert.match(result.stdout + result.stderr, /L3-Lite export summary may be stale/)
 })
 
 test('strict CI refuses to guess a base reference', () => {
@@ -114,7 +233,21 @@ test('v0.1 upgrade adds defaults without replacing a manual mirror matrix', () =
   const upgraded = json(root, '.fmp/config.json')
   assert.equal(upgraded.version, '0.2')
   assert.equal(upgraded.enforcement.docSync, 'required-or-waiver')
+  assert.equal(upgraded.enforcement.checkEvidence, 'fail')
+  assert.equal(upgraded.checks.evidenceFile, '.fmp/check-evidence.json')
   assert.equal(fs.readFileSync(matrixPath, 'utf8'), manualMatrix)
+})
+
+test('classification treats the FMP control plane as P0', () => {
+  const files = walk(skillRoot)
+  const classification = classify(files)
+  assert.ok(classification.p0Files.includes('scripts/fmp-init.mjs'))
+  assert.ok(classification.p0Files.includes('scripts/fmp-check.mjs'))
+  assert.ok(classification.p0Files.includes('scripts/fmp-sync-plan.mjs'))
+  assert.ok(classification.p0Files.includes('scripts/lib/fmp-utils.mjs'))
+
+  const mirrors = buildMirrorMatrix(classification, detectDocs(files))
+  assert.ok(mirrors.some(mirror => mirror.id === 'general-architecture'))
 })
 
 function fixture() {

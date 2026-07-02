@@ -113,9 +113,16 @@ node .agents/skills/fmp-guardian/scripts/fmp-check.mjs --strict
 FMP_BASE_REF=origin/main node .agents/skills/fmp-guardian/scripts/fmp-check.mjs --strict
 ```
 
-For every changed P0 mirror, strict mode requires either a changed mapped document
-or a current `no-doc-impact` waiver. CI must provide `--base` or `FMP_BASE_REF`;
-the checker never guesses a CI comparison range.
+For every changed P0 mirror, strict mode requires either a changed mapped
+`FMP:SEMANTIC:*` block or a current `no-doc-impact` waiver. Refreshing
+deterministic scanner facts alone does not satisfy semantic sync. CI must provide
+`--base` or `FMP_BASE_REF`; the checker never guesses a CI comparison range. When
+configured check/eval commands exist, strict mode also requires current passing
+evidence from `fmp-eval --run`.
+
+If `.fmp/config.json` or `.fmp/mirror-matrix.yaml` changes in the same branch,
+strict mode evaluates changed P0 files against the union of base and current FMP
+policy so a branch cannot weaken its own gate.
 
 ### Seed L3-Lite anchors
 
@@ -150,6 +157,10 @@ another CI system with `FMP_BASE_REF` set to the pull request base commit.
 node .agents/skills/fmp-guardian/scripts/fmp-eval.mjs
 node .agents/skills/fmp-guardian/scripts/fmp-eval.mjs --run
 ```
+
+`--run` executes configured commands and writes `.fmp/check-evidence.json`, which
+`fmp-check --strict` validates against the current base commit, changed-P0
+fingerprint, and configured command fingerprint.
 
 ## Safety
 

@@ -97,6 +97,9 @@ const defaults = {
     maxLines: 6,
     requiredTags: ['FMP', 'MIRROR', 'EXPORT', 'CHECK'],
     failOnMissing: false,
+    failOnInvalidMirror: false,
+    failOnMirrorMismatch: false,
+    failOnStaleExport: false,
   },
   agentsDocs: {
     maxRootBytes: 24000,
@@ -121,9 +124,11 @@ const defaults = {
     snapshotDrift: 'fail',
     staleReferences: 'fail',
     semanticCompletion: 'fail',
+    checkEvidence: 'fail',
   },
   checks: {
     commands,
+    evidenceFile: '.fmp/check-evidence.json',
   },
 }
 const config = mergeConfig(defaults, existingConfig)

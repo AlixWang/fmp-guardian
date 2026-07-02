@@ -49,7 +49,8 @@ export const P0_KEYWORDS = [
   'billing', 'payment', 'payments', 'memory', 'retrieval', 'rag', 'vector',
   'graph', 'prompt', 'prompts', 'tool', 'tools', 'eval', 'evals', 'benchmark',
   'benchmarks', 'contract', 'contracts', 'protocol', 'event', 'events', 'queue',
-  'worker', 'workers', 'webhook', 'webhooks',
+  'worker', 'workers', 'webhook', 'webhooks', 'guard', 'guardian', 'policy',
+  'enforce', 'validator', 'validation',
 ]
 
 export const P1_KEYWORDS = [
@@ -127,6 +128,30 @@ export function isCodeFile(file) {
   return CODE_EXTS.has(path.extname(file))
 }
 
+export function isRiskConfigFile(file) {
+  const lower = normalize(file).toLowerCase()
+  const base = path.basename(lower)
+  return base === 'package.json'
+    || base === 'pnpm-workspace.yaml'
+    || base === 'turbo.json'
+    || base === 'dockerfile'
+    || base === 'docker-compose.yml'
+    || base === 'docker-compose.yaml'
+    || /^tsconfig(?:\.[^/]+)?\.json$/.test(base)
+    || /(?:^|\/)\.github\/workflows\/[^/]+\.ya?ml$/.test(lower)
+    || /(?:^|\/)(wrangler|vite|next|nuxt|svelte|astro|rollup|webpack|open-next)\.config\./.test(lower)
+    || /(?:^|\/)(fly|render|netlify|vercel|railway)\.(toml|ya?ml|json)$/.test(lower)
+}
+
+export function isControlPlaneFile(file) {
+  const lower = normalize(file).toLowerCase()
+  const base = path.basename(lower)
+  const parts = pathSegments(lower)
+  const inCommandDir = parts.some(part => ['scripts', 'bin', 'cmd', 'tools', 'cli', 'tasks'].includes(part))
+  const commandName = /(?:^|[-_.])(init|check|scan|sync|doctor|seed|guard|guardian|gate|policy|enforce|validate|verify|audit|migrate|deploy|release|ci)(?:[-_.]|$)/.test(base)
+  return isCodeFile(file) && ((inCommandDir && commandName) || /^fmp[-.]/.test(base))
+}
+
 export function isGeneratedLike(file) {
   const lower = file.toLowerCase()
   return lower.includes('.gen.')
@@ -156,6 +181,8 @@ export function scorePath(file) {
   for (const kw of P1_KEYWORDS) {
     if (segments.includes(kw) || base.includes(kw)) p1 += 1
   }
+  if (isControlPlaneFile(file)) p0 += 6
+  if (isRiskConfigFile(file)) p0 += 4
   if (isGeneratedLike(file)) return { level: 'exempt', p0, p1 }
   if (p0 >= 3) return { level: 'p0', p0, p1 }
   if (p1 >= 1) return { level: 'p1', p0, p1 }
@@ -328,7 +355,7 @@ export function classify(files) {
   for (const f of files) {
     const score = scorePath(f)
     if (score.level === 'exempt') exemptFiles.push(f)
-    else if (isCodeFile(f) && score.level === 'p0') p0Files.push(f)
+    else if ((isCodeFile(f) || isRiskConfigFile(f)) && score.level === 'p0') p0Files.push(f)
     else if (isCodeFile(f) && score.level === 'p1') p1Files.push(f)
   }
   const p0 = unique(p0Files.map(inferBoundaryPattern)).slice(0, 80)
@@ -644,6 +671,17 @@ export function extractL3(content) {
   if (idx < 0 || idx > 30) return null
   const end = Math.min(lines.length, idx + 12)
   return lines.slice(Math.max(0, idx - 2), end).join('\n')
+}
+
+export function l3Fields(content) {
+  const l3 = extractL3(content)
+  if (!l3) return {}
+  const fields = {}
+  for (const line of l3.split(/\r?\n/)) {
+    const match = line.match(/\[(FMP|MIRROR|EXPORT|CHECK)\]:\s*(.+?)\s*$/)
+    if (match) fields[match[1]] = match[2]
+  }
+  return fields
 }
 
 export function inferExports(file, root) {

@@ -37,6 +37,61 @@ export function codeFingerprint(root, baseCommit, files) {
   return hash.digest('hex')
 }
 
+export function valueFingerprint(value) {
+  return crypto.createHash('sha256').update(JSON.stringify(stableObject(value))).digest('hex')
+}
+
+export function readGitFile(root, ref, file) {
+  if (!ref || ref === 'manual') return null
+  try {
+    return execFileSync('git', ['show', `${ref}:${normalize(file)}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  }
+  catch {
+    return null
+  }
+}
+
+export function extractFmpManagedBlocks(text) {
+  return extractFmpBlocks(text, /^.+$/)
+}
+
+export function extractFmpSemanticBlocks(text) {
+  const blocks = []
+  const pattern = /<!-- FMP:(SEMANTIC:[A-Za-z0-9:_-]+)_START -->([\s\S]*?)<!-- FMP:\1_END -->/g
+  for (const match of text.matchAll(pattern)) {
+    blocks.push({ marker: match[1], body: match[2].trim() })
+  }
+  return blocks
+}
+
+function extractFmpBlocks(text, markerPattern) {
+  const blocks = []
+  const pattern = /<!-- FMP:([A-Za-z0-9:_-]+)_START -->([\s\S]*?)<!-- FMP:\1_END -->/g
+  for (const match of text.matchAll(pattern)) {
+    if (!markerPattern.test(match[1])) continue
+    blocks.push({ marker: match[1], body: match[2].trim() })
+  }
+  return blocks
+}
+
+export function fmpManagedBlocksChanged(root, baseCommit, file) {
+  const before = readGitFile(root, baseCommit, file) ?? ''
+  const current = readText(path.join(root, file))
+  const beforeBlocks = extractFmpManagedBlocks(before)
+  const currentBlocks = extractFmpManagedBlocks(current)
+  if (!beforeBlocks.length && !currentBlocks.length) return before !== current
+  return JSON.stringify(beforeBlocks) !== JSON.stringify(currentBlocks)
+}
+
+export function fmpSemanticBlocksChanged(root, baseCommit, file) {
+  const before = readGitFile(root, baseCommit, file) ?? ''
+  const current = readText(path.join(root, file))
+  const beforeBlocks = extractFmpSemanticBlocks(before)
+  const currentBlocks = extractFmpSemanticBlocks(current)
+  if (!beforeBlocks.length && !currentBlocks.length) return before !== current
+  return JSON.stringify(beforeBlocks) !== JSON.stringify(currentBlocks)
+}
+
 export function writeImpactFile(file, data) {
   const lines = [
     'version: 0.2',
@@ -106,4 +161,10 @@ function git(root, args) {
   catch (error) {
     throw new Error(`Git command failed: git ${args.join(' ')}\n${error.stderr?.trim() || error.message}`)
   }
+}
+
+function stableObject(value) {
+  if (Array.isArray(value)) return value.map(stableObject)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableObject(value[key])]))
 }
