@@ -1,7 +1,6 @@
 ---
 name: fmp-guardian
 description: Generic Fractal Mirror Protocol bootstrap and maintenance skill. Use in any repository to initialize project-local AGENTS.md, .fmp config, mirror matrix, L3-Lite anchors, sync plans, and drift/eval checks without hardcoding project-specific paths.
-user-invokable: true
 ---
 
 # FMP Guardian

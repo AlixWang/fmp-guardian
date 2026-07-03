@@ -6,11 +6,10 @@ This package is intentionally project-agnostic. It does not know your repository
 
 ## Install
 
-Copy this folder into your project:
+Install the skill directory from GitHub:
 
 ```bash
-mkdir -p .agents/skills
-cp -R fmp-guardian .agents/skills/fmp-guardian
+npx skills add https://github.com/AlixWang/fmp-guardian/tree/main/skills/fmp-guardian -a codex -y
 ```
 
 Then initialize FMP:
@@ -34,6 +33,33 @@ Optional: add commands to your root `package.json`:
   }
 }
 ```
+
+For a local checkout, install the skill payload with:
+
+```bash
+./install.sh /path/to/project/.agents/skills/fmp-guardian
+```
+
+## Repository layout
+
+```text
+README.md
+package.json
+install.sh
+skills/
+  fmp-guardian/
+    SKILL.md
+    scripts/
+    templates/
+    docs/
+    heuristics/
+    recipes/
+test/
+```
+
+The root directory intentionally does not contain `SKILL.md`. The installable
+skill is `skills/fmp-guardian/`, so skill installers copy the bundled resources
+with the skill instead of treating the repository root as a single-file skill.
 
 ## What it creates
 
@@ -148,8 +174,10 @@ change. Any subsequent P0 edit invalidates it.
 
 ### CI
 
-Use `templates/fmp-ci.yml.tpl` for GitHub Actions, or run the equivalent command in
-another CI system with `FMP_BASE_REF` set to the pull request base commit.
+Use `skills/fmp-guardian/templates/fmp-ci.yml.tpl` from this repository, or the
+installed skill's `templates/fmp-ci.yml.tpl`, for GitHub Actions. In another CI
+system, run the equivalent command with `FMP_BASE_REF` set to the pull request
+base commit.
 
 ### Plan or run checks/evals
 

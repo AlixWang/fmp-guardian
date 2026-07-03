@@ -5,14 +5,14 @@
   "type": "module",
   "description": "Generic Fractal Mirror Protocol Skill for agent-native codebases.",
   "scripts": {
-    "fmp:init": "node scripts/fmp-init.mjs",
-    "fmp:scan": "node scripts/fmp-scan.mjs",
-    "fmp:check": "node scripts/fmp-check.mjs",
-    "fmp:doctor": "node scripts/fmp-doctor.mjs",
-    "fmp:seed-l3": "node scripts/fmp-seed-l3.mjs --write",
-    "fmp:sync-plan": "node scripts/fmp-sync-plan.mjs",
-    "fmp:eval": "node scripts/fmp-eval.mjs",
-    "test": "node --test"
+    "fmp:init": "node skills/fmp-guardian/scripts/fmp-init.mjs",
+    "fmp:scan": "node skills/fmp-guardian/scripts/fmp-scan.mjs",
+    "fmp:check": "node skills/fmp-guardian/scripts/fmp-check.mjs",
+    "fmp:doctor": "node skills/fmp-guardian/scripts/fmp-doctor.mjs",
+    "fmp:seed-l3": "node skills/fmp-guardian/scripts/fmp-seed-l3.mjs --write",
+    "fmp:sync-plan": "node skills/fmp-guardian/scripts/fmp-sync-plan.mjs",
+    "fmp:eval": "node skills/fmp-guardian/scripts/fmp-eval.mjs",
+    "test": "node --test test/*.test.mjs"
   },
   "engines": {
     "node": ">=18"

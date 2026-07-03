@@ -5,9 +5,9 @@ import path from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { buildMirrorMatrix, classify, detectDocs, walk } from '../scripts/lib/fmp-utils.mjs'
+import { buildMirrorMatrix, classify, detectDocs, walk } from '../skills/fmp-guardian/scripts/lib/fmp-utils.mjs'
 
-const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../skills/fmp-guardian')
 
 test('initialization builds a stable architecture baseline and preserves human prose', () => {
   const root = fixture()
