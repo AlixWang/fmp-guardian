@@ -2,10 +2,59 @@
 
 FMP is a low-noise semantic synchronization protocol for code agents.
 
+It guarantees one narrow thing: code facts, architecture semantics, agent
+context, and verification evidence continue to describe the same repository
+reality.
+
 Broad project scans exclude local tool and agent metadata directories by default,
 including `.agents`, `.claude`, `.codex`, `.cursor`, `.fmp`, `.kiro`, editor
 folders, dependency folders, and build/cache outputs. Root `AGENTS.md` and
 explicit `.fmp/*` files are still read when commands need them.
+
+## Core Invariant
+
+```text
+P0 code path
+  -> mirror matrix
+  -> architecture semantic mirror
+  -> semantic block or current waiver
+  -> check/eval evidence
+  -> strict gate
+```
+
+FMP should remain this chain. Features that do not strengthen the chain should
+stay outside the protocol or be implemented as optional inputs.
+
+## What FMP Is Not
+
+FMP is not a graph tool, agent memory system, ADR manager, plan tracker, or docs
+generator. Those systems can provide useful signals, but FMP treats them as
+detectors, validators, or routers that feed the existing protocol chain.
+
+## Sources of Truth
+
+The default FMP truth set is:
+
+- `AGENTS.md` for low-noise agent entry
+- `.fmp/config.json` for local policy
+- `.fmp/mirror-matrix.yaml` for code-to-mirror binding
+- `.fmp/architecture-snapshot.json` for the deterministic code-fact baseline
+- `docs/architecture/**` `FMP:SEMANTIC:*` blocks for reviewed semantics
+- `docs/adr/**`, when present, for architectural decisions
+- `.fmp/impact.yaml` for branch-local no-doc-impact waivers
+- `.fmp/check-evidence.json` for current verification evidence
+
+Do not add `graph.db`, `memory/`, `decisions.jsonl`, `contracts.yaml`, or
+`PLAN.md` as authoritative FMP state. Use them to produce findings that update
+or validate the truth set above.
+
+## Extension Model
+
+New capabilities should fit one role:
+
+- detector: discovers affected mirrors, changed boundaries, or risk signals
+- validator: checks mirror, ADR, AGENTS, snapshot, or evidence conformance
+- router: recommends the minimum context an agent should read
 
 ## Principles
 
@@ -15,6 +64,8 @@ explicit `.fmp/*` files are still read when commands need them.
 4. L3-Lite is a file anchor, not a file manual.
 5. CI/checks should judge mechanical drift.
 6. Eval is part of the semantic mirror.
+7. Derived graphs are detector evidence, not architecture authority.
+8. Add checkers before adding new knowledge sources.
 
 ## Levels
 

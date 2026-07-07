@@ -2,7 +2,38 @@
 
 Generic Fractal Mirror Protocol Skill for agent-native codebases.
 
+FMP is a semantic consistency protocol. It keeps code facts, architecture
+semantics, agent context, and verification evidence pointed at the same
+repository reality.
+
 This package is intentionally project-agnostic. It does not know your repository paths in advance. It discovers your project and generates local FMP rules under `.fmp/`.
+
+## Positioning
+
+FMP is not a graph tool, agent memory system, ADR manager, or documentation
+generator. Those can be useful inputs, but they must not become competing
+sources of truth.
+
+The core invariant is narrow:
+
+```text
+P0 code path
+  -> mirror matrix
+  -> architecture semantic mirror
+  -> semantic block or current waiver
+  -> check/eval evidence
+  -> strict gate
+```
+
+Borrowed capabilities should enter FMP as one of three roles:
+
+- detector: finds possibly affected mirrors
+- validator: checks mirror, ADR, AGENTS, snapshot, or evidence conformance
+- router: tells an agent which low-noise context to read for a task
+
+Do not add a new authoritative knowledge source unless it replaces an existing
+one. Dependency graphs, memories, decision journals, and quality contracts should
+feed the existing mirror/evidence chain instead.
 
 ## Install
 
@@ -80,11 +111,30 @@ docs/architecture/modules/*.md   # only for detected boundaries
 - `.fmp/config.json` stores project-local FMP rules.
 - `.fmp/mirror-matrix.yaml` maps code areas to semantic mirrors.
 - `.fmp/architecture-snapshot.json` is a deterministic architecture fact baseline.
+- Dependency edges and inferred matches are detector evidence, not a separate
+  architecture authority.
 - Architecture docs separate deterministic FMP blocks from nested agent-reviewed
   semantic blocks; human prose and reviewed semantics survive scanner refreshes.
+- ADRs, if present, remain the decision source of truth; ADR-aware validators
+  should bind findings back to affected mirrors and evidence.
 - L3-Lite anchors are required only for `l3Lite.selectedFiles` when `requiredFor` is `["selected-p0"]`.
 - Project scans ignore common tool and agent metadata directories such as `.agents`, `.claude`, `.codex`, `.cursor`, `.fmp`, `.kiro`, `.vscode`, and build/cache outputs.
 - FMP checks help catch code/doc/eval drift.
+
+## Extension model
+
+FMP can grow by adding checkers, not by multiplying truth sources.
+
+Good extensions:
+
+- boundary validators that use dependency edges to flag cross-layer drift
+- sync-plan detectors that find likely affected mirrors
+- task routers that recommend the minimal docs an agent should read
+- conformance reports for mirror, ADR, AGENTS, snapshot, and eval evidence
+
+Avoid extensions that make `graph.db`, `memory/`, `decisions.jsonl`,
+`contracts.yaml`, or `PLAN.md` authoritative FMP state. If a project already has
+those files, treat them as inputs to existing mirrors, ADRs, or evidence gates.
 
 ## Commands
 

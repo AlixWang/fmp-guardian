@@ -23,6 +23,8 @@ test('initialization builds a stable architecture baseline and preserves human p
 
   const overview = path.join(root, 'docs/architecture/overview.md')
   assert.match(fs.readFileSync(overview, 'utf8'), /FMP:ARCHITECTURE_START/)
+  assert.match(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), /Task Context Router/)
+  assert.match(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), /relevant ADRs/)
   completeSemanticDocs(root)
   fs.appendFileSync(overview, '\nHuman-maintained rationale.\n')
   run('scripts/fmp-init.mjs', ['--root', root])
@@ -213,6 +215,92 @@ test('strict mode rejects an unreviewed semantic baseline', () => {
   const result = invoke('scripts/fmp-check.mjs', ['--root', root, '--strict'])
   assert.notEqual(result.status, 0)
   assert.match(result.stdout + result.stderr, /semantic review is incomplete/i)
+})
+
+test('doctor reports conformance dimensions and unmapped P0 drift', () => {
+  const root = fixture()
+  run('scripts/fmp-init.mjs', ['--root', root])
+  write(root, '.fmp/mirror-matrix.yaml', `version: 0.2
+
+mirrors:
+  - id: api-contracts
+    code:
+      - apps/api/**
+    docs:
+      - docs/architecture/overview.md
+    evals: []
+    sync_when:
+      - route changed
+`)
+
+  const result = invoke('scripts/fmp-doctor.mjs', ['--root', root])
+  assert.equal(result.status, 0, result.stdout + result.stderr)
+  assert.match(result.stdout, /## Conformance/)
+  assert.match(result.stdout, /P0 mapping conformance: DEBT/)
+  assert.match(result.stdout, /P0 mapping drift: \d+ P0 file\(s\) have no mirror binding/)
+  assert.match(result.stdout, /Map \d+ P0 code file\(s\) to semantic mirrors/)
+})
+
+test('doctor flags structurally suspicious check evidence', () => {
+  const root = fixture()
+  run('scripts/fmp-init.mjs', ['--root', root])
+  write(root, '.fmp/check-evidence.json', JSON.stringify({
+    version: '0.2',
+    completedAt: '2999-01-01T00:00:01.000Z',
+    runs: [{ name: 'test', command: 'node --test', status: 0 }],
+  }, null, 2))
+
+  const result = invoke('scripts/fmp-doctor.mjs', ['--root', root])
+  assert.equal(result.status, 0, result.stdout + result.stderr)
+  assert.match(result.stdout, /Eval\/check conformance: RECORDED WITH WARNINGS/)
+  assert.match(result.stdout, /completedAt is in the future/)
+  assert.match(result.stdout, /codeFingerprint/)
+})
+
+test('sync plan routes context and guards source of truth', () => {
+  const root = fixture()
+  run('scripts/fmp-init.mjs', ['--root', root])
+  write(root, 'docs/adr/0001-core.md', '# ADR\n')
+
+  const result = invoke('scripts/fmp-sync-plan.mjs', [
+    '--root', root,
+    '--changed', 'packages/core/src/service.ts',
+    'change core behavior',
+  ])
+  assert.equal(result.status, 0, result.stdout + result.stderr)
+  assert.match(result.stdout, /## Recommended Context/)
+  assert.match(result.stdout, /docs\/architecture\/modules\/packages-core\.md/)
+  assert.match(result.stdout, /docs\/adr\/0001-core\.md/)
+  assert.match(result.stdout, /detector evidence/)
+  assert.match(result.stdout, /detector, validator, or router/)
+})
+
+test('sync plan does not route unmapped changed files to arbitrary mirrors', () => {
+  const root = fixture()
+  run('scripts/fmp-init.mjs', ['--root', root])
+  write(root, '.fmp/mirror-matrix.yaml', `version: 0.2
+
+mirrors:
+  - id: api-contracts
+    code:
+      - apps/api/**
+    docs:
+      - docs/architecture/overview.md
+    evals: []
+    sync_when:
+      - route changed
+`)
+
+  const result = invoke('scripts/fmp-sync-plan.mjs', [
+    '--root', root,
+    '--changed', 'packages/core/src/service.ts',
+    'change core behavior',
+  ])
+  assert.equal(result.status, 0, result.stdout + result.stderr)
+  assert.match(result.stdout, /No mirror matched the supplied changed files/)
+  assert.match(result.stdout, /P0 files with no mirror binding/)
+  assert.doesNotMatch(result.stdout, /docs\/architecture\/overview\.md[\s\S]*## Recommended Context/)
+  assert.doesNotMatch(result.stdout, /docs\/architecture\/modules\/packages-core\.md/)
 })
 
 test('v0.1 upgrade adds defaults without replacing a manual mirror matrix', () => {

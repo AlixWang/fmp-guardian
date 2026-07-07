@@ -15,6 +15,21 @@ Your job is to discover the current repository, infer its architecture boundarie
 The skill is universal.  
 The project rules are local.
 
+The product boundary is narrow: FMP is a semantic consistency protocol for
+agent-maintained codebases. It is not a general graph database, memory system,
+ADR manager, plan tracker, or documentation generator.
+
+The core chain is:
+
+```text
+P0 code path
+  -> mirror matrix
+  -> architecture semantic mirror
+  -> semantic block or current waiver
+  -> check/eval evidence
+  -> strict gate
+```
+
 Never hardcode paths from another project.
 Never assume `src/server`, `apps/web`, `spec`, or `evals` exist.
 Always discover first.
@@ -39,6 +54,29 @@ It keeps code facts and semantic mirrors aligned through:
 
 FMP is not "write more docs".  
 FMP is "give code agents a low-noise semantic map".
+
+## Extension Boundary
+
+When adapting ideas from graph tools, agent memory tools, ADR governance, or
+project reality checks, fit them into one of these roles:
+
+- detector: finds possibly affected mirrors
+- validator: checks mirror, ADR, AGENTS, snapshot, or evidence conformance
+- router: recommends the minimum context an agent should read
+
+Do not add new authoritative knowledge sources by default. `graph.db`,
+`memory/`, `decisions.jsonl`, `contracts.yaml`, and `PLAN.md` may be useful
+inputs, but FMP should bind their findings back to the existing mirror matrix,
+semantic blocks, ADRs, and evidence files.
+
+## Reference Docs
+
+When changing this skill, keep these bundled references aligned with the
+operational instructions above:
+
+- `docs/protocol.md`
+- `docs/adr/0001-fmp-as-semantic-consistency-protocol.md`
+- `docs/glossary.md`
 
 ## Modes
 
@@ -101,12 +139,14 @@ Steps:
 1. Summarize the design decision.
 2. Resolve the Git comparison base and inspect changed files.
 3. Map affected code areas using `.fmp/mirror-matrix.yaml`.
-4. Refresh the architecture snapshot and inspect structural deltas.
-5. Update affected `FMP:SEMANTIC:*` blocks. Preserve deterministic facts and human prose.
-6. If no mapped `FMP:SEMANTIC:*` block needs a change, write a precise
+4. Recommend the minimum context to read: root agent guide, config, matrix,
+   affected mirror docs, current snapshot, and relevant L3-Lite anchors.
+5. Refresh the architecture snapshot and inspect structural deltas.
+6. Update affected `FMP:SEMANTIC:*` blocks. Preserve deterministic facts and human prose.
+7. If no mapped `FMP:SEMANTIC:*` block needs a change, write a precise
    `no-doc-impact` reason to the current `.fmp/impact.yaml`; never reuse a stale
    waiver.
-7. Identify and run relevant checks/evals.
+8. Identify and run relevant checks/evals.
 
 ### Mode: check
 
@@ -137,7 +177,9 @@ Steps:
 4. Detect stale mirror links.
 5. Detect missing docs for high-risk modules.
 6. Detect stale architecture snapshots and unmapped boundaries.
-7. Recommend minimal repairs.
+7. Report conformance by dimension: mirror, architecture, semantic, agent-entry,
+   P0 mapping, and eval/check evidence.
+8. Recommend minimal repairs.
 
 ## P0 Heuristics
 
